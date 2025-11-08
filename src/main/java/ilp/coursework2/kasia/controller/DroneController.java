@@ -18,6 +18,7 @@ import ilp.coursework2.kasia.model.Drone;
 import ilp.coursework2.kasia.model.NextPositionRequest;
 import ilp.coursework2.kasia.model.Position;
 import ilp.coursework2.kasia.model.PositionPair;
+import ilp.coursework2.kasia.model.QueryCriteria;
 import ilp.coursework2.kasia.model.RegionRequest;
 import ilp.coursework2.kasia.service.DroneQueryService;
 import ilp.coursework2.kasia.service.IlpService;
@@ -222,6 +223,22 @@ public class DroneController implements IDroneController {
                 attributeName,
                 attributeValue);
 
+        return ResponseEntity.ok(droneIds);
+    }
+
+    /**
+     * Queries drones by multiple criteria with AND logic.
+     * All criteria must match for a drone to be included.
+     * 
+     * POST /api/v1/query
+     * 
+     * @param criteria list of query criteria (attribute, operator, value)
+     * @return list of drone IDs matching ALL criteria
+     */
+    @PostMapping("/query")
+    public ResponseEntity<List<Integer>> query(@RequestBody List<QueryCriteria> criteria) {
+        List<Drone> allDrones = ilpService.getAllDrones();
+        List<Integer> droneIds = droneQueryService.queryByMultipleCriteria(allDrones, criteria);
         return ResponseEntity.ok(droneIds);
     }
 }

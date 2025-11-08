@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import ilp.coursework2.kasia.model.Drone;
 import ilp.coursework2.kasia.model.DroneCapability;
+import ilp.coursework2.kasia.model.QueryCriteria;
 import ilp.coursework2.kasia.model.enums.DroneAttribute;
 import ilp.coursework2.kasia.model.enums.QueryOperator;
 
@@ -41,6 +42,25 @@ public class DroneQueryService {
     }
 
     /**
+     * Filters drones based on multiple criteria joined by AND.
+     * All criteria must match for a drone to be included.
+     *
+     * @param drones   the list of drones to filter
+     * @param criteria list of query criteria to apply
+     * @return list of drone IDs matching ALL criteria
+     */
+    public List<Integer> queryByMultipleCriteria(List<Drone> drones, List<QueryCriteria> criteria) {
+        if (criteria == null || criteria.isEmpty()) {
+            return List.of();
+        }
+
+        return drones.stream()
+                .filter(drone -> matchesAllCriteria(drone, criteria))
+                .map(Drone::id)
+                .collect(Collectors.toList());
+    }
+
+    /**
      * Checks if a drone matches a given attribute-value pair with specified
      * operator.
      *
@@ -58,6 +78,31 @@ public class DroneQueryService {
         }
 
         return compareValues(actualValue, valueStr, operator);
+    }
+
+    /**
+     * Checks if a drone matches ALL criteria (AND logic).
+     *
+     * @param drone    the drone to check
+     * @param criteria list of criteria to check
+     * @return true if ALL criteria match, false otherwise
+     */
+    private boolean matchesAllCriteria(Drone drone, List<QueryCriteria> criteria) {
+        for (QueryCriteria criterion : criteria) {
+            DroneAttribute attribute = DroneAttribute.fromString(criterion.attribute());
+            QueryOperator operator = QueryOperator.fromString(criterion.operator());
+
+            // Invalid attribute or operator, fail this criterion
+            if (attribute == null || operator == null)
+                return false;
+
+            if (!matchesAttribute(drone, attribute, criterion.value(), operator))
+                return false;
+
+        }
+
+        // All criteria matched
+        return true;
     }
 
     /**
