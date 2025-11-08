@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import ilp.coursework2.kasia.model.Drone;
+import ilp.coursework2.kasia.model.DroneForServicePoint;
 
 /**
  * Client service for interacting with the ILP REST API.
@@ -34,10 +35,6 @@ public class IlpService {
         return ilpEndpoint + path;
     }
 
-    // ==================
-    // Static Queries
-    // ==================
-
     /**
      * Fetches ALL drones from the ILP service.
      * 
@@ -54,5 +51,23 @@ public class IlpService {
 
         Drone[] drones = response.getBody();
         return drones != null ? Arrays.asList(drones) : List.of();
+    }
+
+    /**
+     * Fetches drone availability information for all service points.
+     * 
+     * GET /drones-for-service-points
+     * 
+     * @return list of drone availability by service point
+     */
+    public List<DroneForServicePoint> getDronesForServicePoints() {
+        String url = buildUrl("/drones-for-service-points");
+
+        ResponseEntity<DroneForServicePoint[]> response = restTemplate.getForEntity(
+                url,
+                DroneForServicePoint[].class);
+
+        DroneForServicePoint[] data = response.getBody();
+        return data != null ? Arrays.asList(data) : List.of();
     }
 }
