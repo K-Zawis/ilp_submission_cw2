@@ -1,7 +1,10 @@
 package ilp.coursework2.kasia.controller;
 
+import java.util.List;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -11,10 +14,12 @@ import ilp.coursework2.kasia.interfaces.IDroneController;
 import ilp.coursework2.kasia.interfaces.IDroneService;
 import ilp.coursework2.kasia.interfaces.IPositionValidator;
 import ilp.coursework2.kasia.interfaces.IRegionValidator;
+import ilp.coursework2.kasia.model.Drone;
 import ilp.coursework2.kasia.model.NextPositionRequest;
 import ilp.coursework2.kasia.model.Position;
 import ilp.coursework2.kasia.model.PositionPair;
 import ilp.coursework2.kasia.model.RegionRequest;
+import ilp.coursework2.kasia.service.IlpService;
 
 /**
  * REST controller for drone navigation endpoints.
@@ -29,6 +34,7 @@ public class DroneController implements IDroneController {
     private final IDroneService droneService;
     private final IPositionValidator positionValidator;
     private final IRegionValidator regionValidator;
+    private final IlpService ilpService;
 
     /**
      * Constructs a new DroneController with required dependencies.
@@ -36,14 +42,17 @@ public class DroneController implements IDroneController {
      * @param droneService      service for drone navigation calculations
      * @param positionValidator validator for position-based requests
      * @param regionValidator   validator for region-based requests
+     * @param ilpService        service for ilp service endpoint
      */
     public DroneController(
             IDroneService droneService,
             IPositionValidator positionValidator,
-            IRegionValidator regionValidator) {
+            IRegionValidator regionValidator,
+            IlpService ilpService) {
         this.droneService = droneService;
         this.positionValidator = positionValidator;
         this.regionValidator = regionValidator;
+        this.ilpService = ilpService;
     }
 
     /**
@@ -132,4 +141,55 @@ public class DroneController implements IDroneController {
         return ResponseEntity.ok(inRegion);
     }
 
+    // ==================
+    // CW2 Static Query Endpoints
+    // ==================
+
+    /**
+     * Retrieves drone IDs that support cooling (or not).
+     * 
+     * GET /api/v1/dronesWithCooling/{state}
+     * 
+     * @param state "true" for drones with cooling, "false" for drones without
+     * @return list of drone IDs
+     */
+    @GetMapping("/dronesWithCooling/{state}")
+    public ResponseEntity<List<Integer>> dronesWithCooling(@PathVariable String state) {
+        // Fetch ALL drones from ILP service
+        List<Drone> allDrones = ilpService.getAllDrones();
+
+        // Filter based on cooling capability
+        boolean requiresCooling = state.equals("true");
+        List<Integer> droneIds = allDrones.stream()
+                .filter(drone -> drone.capability().hasCooling() == requiresCooling)
+                .map(Drone::id)
+                .toList();
+
+        return ResponseEntity.ok(droneIds);
+    }
+
+    /**
+     * Retrieves detailed information about a specific drone.
+     * 
+     * GET /api/v1/droneDetails/{id}
+     * 
+     * @param id the drone ID
+     * @return the drone object with full details, or 404 if not found
+     */
+    @GetMapping("/droneDetails/{id}")
+    public ResponseEntity<Drone> droneDetails(@PathVariable int id) {
+        // Fetch ALL drones from ILP service
+        List<Drone> allDrones = ilpService.getAllDrones();
+
+        // Find the specific drone by ID
+        Drone drone = allDrones.stream()
+                .filter(d -> d.id() == id)
+                .findFirst()
+                .orElse(null);
+
+        if (drone == null)
+            return ResponseEntity.notFound().build();
+
+        return ResponseEntity.ok(drone);
+    }
 }
