@@ -19,6 +19,7 @@ import ilp.coursework2.kasia.model.NextPositionRequest;
 import ilp.coursework2.kasia.model.Position;
 import ilp.coursework2.kasia.model.PositionPair;
 import ilp.coursework2.kasia.model.RegionRequest;
+import ilp.coursework2.kasia.service.DroneQueryService;
 import ilp.coursework2.kasia.service.IlpService;
 
 /**
@@ -35,6 +36,7 @@ public class DroneController implements IDroneController {
     private final IPositionValidator positionValidator;
     private final IRegionValidator regionValidator;
     private final IlpService ilpService;
+    private final DroneQueryService droneQueryService;
 
     /**
      * Constructs a new DroneController with required dependencies.
@@ -48,11 +50,13 @@ public class DroneController implements IDroneController {
             IDroneService droneService,
             IPositionValidator positionValidator,
             IRegionValidator regionValidator,
-            IlpService ilpService) {
+            IlpService ilpService,
+            DroneQueryService droneQueryService) {
         this.droneService = droneService;
         this.positionValidator = positionValidator;
         this.regionValidator = regionValidator;
         this.ilpService = ilpService;
+        this.droneQueryService = droneQueryService;
     }
 
     /**
@@ -191,5 +195,33 @@ public class DroneController implements IDroneController {
             return ResponseEntity.notFound().build();
 
         return ResponseEntity.ok(drone);
+    }
+
+    // ==================
+    // CW2 Dynamic Query Endpoints
+    // ==================
+
+    /**
+     * Queries drones by a single attribute with exact match.
+     * 
+     * GET /api/v1/queryAsPath/{attributeName}/{attributeValue}
+     * 
+     * @param attributeName  the name of the attribute to query (e.g., "capacity",
+     *                       "cooling")
+     * @param attributeValue the value to match (as string)
+     * @return list of drone IDs matching the criteria
+     */
+    @GetMapping("/queryAsPath/{attributeName}/{attributeValue}")
+    public ResponseEntity<List<Integer>> queryAsPath(
+            @PathVariable String attributeName,
+            @PathVariable String attributeValue) {
+
+        List<Drone> allDrones = ilpService.getAllDrones();
+        List<Integer> droneIds = droneQueryService.queryByAttribute(
+                allDrones,
+                attributeName,
+                attributeValue);
+
+        return ResponseEntity.ok(droneIds);
     }
 }
