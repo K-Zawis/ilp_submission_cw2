@@ -15,11 +15,14 @@ import ilp.coursework2.kasia.interfaces.IDroneService;
 import ilp.coursework2.kasia.interfaces.IPositionValidator;
 import ilp.coursework2.kasia.interfaces.IRegionValidator;
 import ilp.coursework2.kasia.model.Drone;
+import ilp.coursework2.kasia.model.DroneForServicePoint;
+import ilp.coursework2.kasia.model.MedDispatchRec;
 import ilp.coursework2.kasia.model.NextPositionRequest;
 import ilp.coursework2.kasia.model.Position;
 import ilp.coursework2.kasia.model.PositionPair;
 import ilp.coursework2.kasia.model.QueryCriteria;
 import ilp.coursework2.kasia.model.RegionRequest;
+import ilp.coursework2.kasia.service.DroneMatchingService;
 import ilp.coursework2.kasia.service.DroneQueryService;
 import ilp.coursework2.kasia.service.IlpService;
 
@@ -38,26 +41,31 @@ public class DroneController implements IDroneController {
     private final IRegionValidator regionValidator;
     private final IlpService ilpService;
     private final DroneQueryService droneQueryService;
+    private final DroneMatchingService droneMatchingService;
 
     /**
      * Constructs a new DroneController with required dependencies.
      *
-     * @param droneService      service for drone navigation calculations
-     * @param positionValidator validator for position-based requests
-     * @param regionValidator   validator for region-based requests
-     * @param ilpService        service for ilp service endpoint
+     * @param droneService         service for drone navigation calculations
+     * @param positionValidator    validator for position-based requests
+     * @param regionValidator      validator for region-based requests
+     * @param ilpService           service for ilp service endpoint
+     * @param droneQueryService
+     * @param droneMatchingService
      */
     public DroneController(
             IDroneService droneService,
             IPositionValidator positionValidator,
             IRegionValidator regionValidator,
             IlpService ilpService,
-            DroneQueryService droneQueryService) {
+            DroneQueryService droneQueryService,
+            DroneMatchingService droneMatchingService) {
         this.droneService = droneService;
         this.positionValidator = positionValidator;
         this.regionValidator = regionValidator;
         this.ilpService = ilpService;
         this.droneQueryService = droneQueryService;
+        this.droneMatchingService = droneMatchingService;
     }
 
     /**
@@ -240,5 +248,34 @@ public class DroneController implements IDroneController {
         List<Drone> allDrones = ilpService.getAllDrones();
         List<Integer> droneIds = droneQueryService.queryByMultipleCriteria(allDrones, criteria);
         return ResponseEntity.ok(droneIds);
+    }
+
+    // ==================
+    // CW2 Availability Query Endpoints
+    // ==================
+
+    /**
+     * Finds drones that can fulfill ALL dispatch requirements.
+     * Returns drones that meet capacity/cooling/heating requirements AND
+     * are available at all dispatch times.
+     * 
+     * POST /api/v1/queryAvailableDrones
+     * 
+     * @param dispatches list of dispatch records to fulfill
+     * @return list of drone IDs that can handle all dispatches
+     */
+    @PostMapping("/queryAvailableDrones")
+    public ResponseEntity<List<Integer>> queryAvailableDrones(
+            @RequestBody List<MedDispatchRec> dispatches) {
+
+        List<Drone> allDrones = ilpService.getAllDrones();
+        List<DroneForServicePoint> allAvailability = ilpService.getDronesForServicePoints();
+
+        List<Integer> matchingDrones = droneMatchingService.findMatchingDrones(
+                dispatches,
+                allDrones,
+                allAvailability);
+
+        return ResponseEntity.ok(matchingDrones);
     }
 }
