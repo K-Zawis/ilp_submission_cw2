@@ -20,7 +20,7 @@ import ilp.coursework2.kasia.model.RegionRequest;
 @Service
 public class DroneService implements IDroneService {
     /** Standard movement distance for the drone (in degrees) */
-    private static final double DISTANCE = 0.00015;
+    public static final double DISTANCE = 0.00015;
 
     /**
      * Calculates the Euclidean distance between two positions.

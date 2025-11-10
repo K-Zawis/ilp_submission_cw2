@@ -1,8 +1,11 @@
 package ilp.coursework2.kasia.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 /**
  * Represents the capabilities and costs of a drone.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record DroneCapability(
         Boolean cooling,
         Boolean heating,
