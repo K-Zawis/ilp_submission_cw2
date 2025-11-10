@@ -9,6 +9,8 @@ import org.springframework.web.client.RestTemplate;
 
 import ilp.coursework2.kasia.model.Drone;
 import ilp.coursework2.kasia.model.DroneForServicePoint;
+import ilp.coursework2.kasia.model.Region;
+import ilp.coursework2.kasia.model.ServicePoint;
 
 /**
  * Client service for interacting with the ILP REST API.
@@ -68,6 +70,42 @@ public class IlpService {
                 DroneForServicePoint[].class);
 
         DroneForServicePoint[] data = response.getBody();
+        return data != null ? Arrays.asList(data) : List.of();
+    }
+
+    /**
+     * Fetches all service points.
+     * 
+     * GET /service-points
+     * 
+     * @return list of service points with locations
+     */
+    public List<ServicePoint> getServicePoints() {
+        String url = buildUrl("/service-points");
+
+        ResponseEntity<ServicePoint[]> response = restTemplate.getForEntity(
+                url,
+                ServicePoint[].class);
+
+        ServicePoint[] data = response.getBody();
+        return data != null ? Arrays.asList(data) : List.of();
+    }
+
+    /**
+     * Fetches restricted areas (no-fly and restricted zones).
+     * 
+     * GET /restricted-areas
+     * 
+     * @return list of restricted regions
+     */
+    public List<Region> getRestrictedAreas() {
+        String url = buildUrl("/restricted-areas");
+
+        ResponseEntity<Region[]> response = restTemplate.getForEntity(
+                url,
+                Region[].class);
+
+        Region[] data = response.getBody();
         return data != null ? Arrays.asList(data) : List.of();
     }
 }

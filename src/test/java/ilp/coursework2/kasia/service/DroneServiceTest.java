@@ -202,7 +202,7 @@ class DroneServiceTest {
                 new Position(-3.184319, 55.942617),
                 new Position(-3.184319, 55.946233),
                 new Position(-3.192473, 55.946233));
-        Region region = new Region("central", vertices);
+        Region region = new Region("central", 0, null, vertices);
         RegionRequest request = new RegionRequest(new Position(-3.188, 55.944), region);
 
         boolean result = droneService.isPointInRegion(request);
@@ -219,7 +219,7 @@ class DroneServiceTest {
                 new Position(1.0, 1.0),
                 new Position(0.0, 1.0),
                 new Position(0.0, 0.0));
-        Region region = new Region("square", vertices);
+        Region region = new Region("square", 0, null, vertices);
         RegionRequest request = new RegionRequest(new Position(2.0, 2.0), region);
 
         boolean result = droneService.isPointInRegion(request);
@@ -236,7 +236,7 @@ class DroneServiceTest {
                 new Position(1.0, 1.0),
                 new Position(0.0, 1.0),
                 new Position(0.0, 0.0));
-        Region region = new Region("square", vertices);
+        Region region = new Region("square", 0, null, vertices);
         RegionRequest request = new RegionRequest(new Position(0.5, 0.0), region);
 
         boolean result = droneService.isPointInRegion(request);
@@ -253,7 +253,7 @@ class DroneServiceTest {
                 new Position(1.0, 1.0),
                 new Position(0.0, 1.0),
                 new Position(0.0, 0.0));
-        Region region = new Region("square", vertices);
+        Region region = new Region("square", 0, null, vertices);
         RegionRequest request = new RegionRequest(new Position(0.0, 0.0), region);
 
         boolean result = droneService.isPointInRegion(request);
