@@ -14,6 +14,7 @@ import ilp.coursework2.kasia.interfaces.IDroneController;
 import ilp.coursework2.kasia.interfaces.IDroneService;
 import ilp.coursework2.kasia.interfaces.IPositionValidator;
 import ilp.coursework2.kasia.interfaces.IRegionValidator;
+import ilp.coursework2.kasia.model.DeliveryPathResponse;
 import ilp.coursework2.kasia.model.Drone;
 import ilp.coursework2.kasia.model.DroneForServicePoint;
 import ilp.coursework2.kasia.model.MedDispatchRec;
@@ -21,7 +22,10 @@ import ilp.coursework2.kasia.model.NextPositionRequest;
 import ilp.coursework2.kasia.model.Position;
 import ilp.coursework2.kasia.model.PositionPair;
 import ilp.coursework2.kasia.model.QueryCriteria;
+import ilp.coursework2.kasia.model.Region;
 import ilp.coursework2.kasia.model.RegionRequest;
+import ilp.coursework2.kasia.model.ServicePoint;
+import ilp.coursework2.kasia.service.DeliveryPlannerService;
 import ilp.coursework2.kasia.service.DroneMatchingService;
 import ilp.coursework2.kasia.service.DroneQueryService;
 import ilp.coursework2.kasia.service.IlpService;
@@ -42,6 +46,7 @@ public class DroneController implements IDroneController {
     private final IlpService ilpService;
     private final DroneQueryService droneQueryService;
     private final DroneMatchingService droneMatchingService;
+    private final DeliveryPlannerService deliveryPlannerService;
 
     /**
      * Constructs a new DroneController with required dependencies.
@@ -59,13 +64,15 @@ public class DroneController implements IDroneController {
             IRegionValidator regionValidator,
             IlpService ilpService,
             DroneQueryService droneQueryService,
-            DroneMatchingService droneMatchingService) {
+            DroneMatchingService droneMatchingService,
+            DeliveryPlannerService deliveryPlannerService) {
         this.droneService = droneService;
         this.positionValidator = positionValidator;
         this.regionValidator = regionValidator;
         this.ilpService = ilpService;
         this.droneQueryService = droneQueryService;
         this.droneMatchingService = droneMatchingService;
+        this.deliveryPlannerService = deliveryPlannerService;
     }
 
     /**
@@ -277,5 +284,35 @@ public class DroneController implements IDroneController {
                 allAvailability);
 
         return ResponseEntity.ok(matchingDrones);
+    }
+
+    /**
+     * Plans optimal delivery routes for multiple dispatch records.
+     * Returns complete flight paths with hover points for deliveries.
+     * 
+     * POST /api/v1/calcDeliveryPath
+     * 
+     * @param dispatches list of medical dispatch records to deliver
+     * @return DeliveryPathResponse with drone paths, moves, and costs
+     */
+    @PostMapping("/calcDeliveryPath")
+    public ResponseEntity<DeliveryPathResponse> calcDeliveryPath(
+            @RequestBody List<MedDispatchRec> dispatches) {
+
+        // Fetch fresh data from ILP service (as per spec requirement)
+        List<Drone> allDrones = ilpService.getAllDrones();
+        List<ServicePoint> servicePoints = ilpService.getServicePoints();
+        List<DroneForServicePoint> availability = ilpService.getDronesForServicePoints();
+        List<Region> restrictedAreas = ilpService.getRestrictedAreas();
+
+        // Plan the deliveries
+        DeliveryPathResponse response = deliveryPlannerService.planDeliveries(
+                dispatches,
+                allDrones,
+                servicePoints,
+                availability,
+                restrictedAreas);
+
+        return ResponseEntity.ok(response);
     }
 }
