@@ -27,7 +27,7 @@ public class DroneQueryService {
      * @param attributeValue the value to match as string
      * @return list of drone IDs matching the criteria
      */
-    public List<Integer> queryByAttribute(List<Drone> drones, String attributeName, String attributeValue) {
+    public List<String> queryByAttribute(List<Drone> drones, String attributeName, String attributeValue) {
         DroneAttribute attribute = DroneAttribute.fromString(attributeName);
 
         if (attribute == null) {
@@ -49,7 +49,7 @@ public class DroneQueryService {
      * @param criteria list of query criteria to apply
      * @return list of drone IDs matching ALL criteria
      */
-    public List<Integer> queryByMultipleCriteria(List<Drone> drones, List<QueryCriteria> criteria) {
+    public List<String> queryByMultipleCriteria(List<Drone> drones, List<QueryCriteria> criteria) {
         if (criteria == null || criteria.isEmpty()) {
             return List.of();
         }

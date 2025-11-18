@@ -7,7 +7,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record Drone(
-                int id,
-                String name,
-                DroneCapability capability) {
+        String id,
+        String name,
+        DroneCapability capability) {
 }

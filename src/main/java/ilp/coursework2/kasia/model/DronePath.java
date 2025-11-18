@@ -6,6 +6,6 @@ import java.util.List;
  * Represents a single drone's complete delivery route.
  */
 public record DronePath(
-        int droneId,
-        List<Delivery> deliveries) {
+                String droneId,
+                List<Delivery> deliveries) {
 }

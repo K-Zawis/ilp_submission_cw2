@@ -34,7 +34,7 @@ public class DroneMatchingService {
      * @param allAvailability drone availability data
      * @return list of drone IDs that can handle all dispatches
      */
-    public List<Integer> findMatchingDrones(
+    public List<String> findMatchingDrones(
             List<MedDispatchRec> dispatches,
             List<Drone> allDrones,
             List<DroneForServicePoint> allAvailability) {

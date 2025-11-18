@@ -9,6 +9,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record DroneAvailability(
-                int id,
-                List<AvailabilitySlot> availability) {
+        String id,
+        List<AvailabilitySlot> availability) {
 }

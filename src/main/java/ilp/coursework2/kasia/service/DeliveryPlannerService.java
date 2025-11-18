@@ -14,15 +14,22 @@ import ilp.coursework2.kasia.model.*;
 @Service
 public class DeliveryPlannerService {
 
+    private final DroneService droneService;
     private final PathfindingService pathfindingService;
     private final DroneMatchingService droneMatchingService;
 
     public DeliveryPlannerService(
+            DroneService droneService,
             PathfindingService pathfindingService,
             DroneMatchingService droneMatchingService) {
+        this.droneService = droneService;
         this.pathfindingService = pathfindingService;
         this.droneMatchingService = droneMatchingService;
     }
+
+    // ==================
+    // Public Service Methods
+    // ==================
 
     /**
      * Plans delivery routes for all dispatches.
@@ -48,7 +55,7 @@ public class DeliveryPlannerService {
 
         // Find drones that can handle ALL dispatches
         // (capacity/cooling/heating/availability)
-        List<Integer> matchingDroneIds = droneMatchingService.findMatchingDrones(
+        List<String> matchingDroneIds = droneMatchingService.findMatchingDrones(
                 dispatches,
                 allDrones,
                 availability);
@@ -59,7 +66,7 @@ public class DeliveryPlannerService {
 
         // Try each matching drone until we find one that meets all constraints
         // including cost
-        for (int droneId : matchingDroneIds) {
+        for (String droneId : matchingDroneIds) {
             Drone drone = allDrones.stream()
                     .filter(d -> d.id() == droneId)
                     .findFirst()
@@ -79,10 +86,15 @@ public class DeliveryPlannerService {
                 continue;
             }
 
-            // Build the complete route
+            // Optimize delivery order using nearest-neighbor algorithm
+            List<MedDispatchRec> optimizedDispatches = optimizeDeliveryOrder(
+                    dispatches,
+                    servicePoint.location());
+
+            // Build the complete route with optimized order
             DronePath dronePath = buildRoute(
                     drone,
-                    dispatches,
+                    optimizedDispatches,
                     servicePoint,
                     restrictedAreas);
 
@@ -92,7 +104,7 @@ public class DeliveryPlannerService {
 
             // Validate maxCost constraints
             if (!validateMaxCostConstraints(dispatches, dronePath, drone)) {
-                continue; // This drone works but exceeds cost limit - try next one
+                continue; // This drone works but exceeds cost - try next
             }
 
             // Success! This drone meets all constraints
@@ -108,6 +120,10 @@ public class DeliveryPlannerService {
         // No drone could fulfill all constraints (including maxCost)
         return new DeliveryPathResponse(0.0, 0, List.of());
     }
+
+    // ==================
+    // Route Building
+    // ==================
 
     /**
      * Builds a complete route for a single drone handling all deliveries.
@@ -188,6 +204,45 @@ public class DeliveryPlannerService {
         return new DronePath(drone.id(), deliveries);
     }
 
+    // ==================
+    // Optimization
+    // ==================
+
+    /**
+     * Optimizes delivery order using nearest-neighbor algorithm.
+     * Greedily visits the closest unvisited delivery location.
+     * 
+     * @param dispatches    original list of dispatches
+     * @param startPosition starting position (service point)
+     * @return optimized list of dispatches in visit order
+     */
+    private List<MedDispatchRec> optimizeDeliveryOrder(
+            List<MedDispatchRec> dispatches,
+            Position startPosition) {
+
+        if (dispatches.size() <= 1) {
+            return new ArrayList<>(dispatches);
+        }
+
+        List<MedDispatchRec> remaining = new ArrayList<>(dispatches);
+        List<MedDispatchRec> optimized = new ArrayList<>();
+        Position currentPosition = startPosition;
+
+        // Greedy nearest-neighbor: always pick closest unvisited delivery
+        while (!remaining.isEmpty()) {
+            MedDispatchRec nearest = findNearestDispatch(currentPosition, remaining);
+            optimized.add(nearest);
+            remaining.remove(nearest);
+            currentPosition = nearest.delivery();
+        }
+
+        return optimized;
+    }
+
+    // ==================
+    // Helper Functions
+    // ==================
+
     /**
      * Finds which service point has a specific drone available.
      * 
@@ -197,7 +252,7 @@ public class DeliveryPlannerService {
      * @return the service point with this drone, or null if not found
      */
     private ServicePoint findServicePointForDrone(
-            int droneId,
+            String droneId,
             List<ServicePoint> servicePoints,
             List<DroneForServicePoint> availability) {
 
@@ -216,6 +271,34 @@ public class DeliveryPlannerService {
         }
 
         return null;
+    }
+
+    /**
+     * Finds the nearest dispatch to a given position.
+     * Uses straight-line (Euclidean) distance.
+     * 
+     * @param from       current position
+     * @param dispatches list of candidate dispatches
+     * @return the nearest dispatch
+     */
+    private MedDispatchRec findNearestDispatch(
+            Position from,
+            List<MedDispatchRec> dispatches) {
+
+        MedDispatchRec nearest = null;
+        double minDistance = Double.MAX_VALUE;
+
+        for (MedDispatchRec dispatch : dispatches) {
+            PositionPair positions = new PositionPair(from, dispatch.delivery());
+            double distance = droneService.calculateDistance(positions);
+
+            if (distance < minDistance) {
+                minDistance = distance;
+                nearest = dispatch;
+            }
+        }
+
+        return nearest;
     }
 
     /**

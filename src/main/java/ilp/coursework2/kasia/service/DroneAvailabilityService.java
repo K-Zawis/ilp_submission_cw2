@@ -28,7 +28,7 @@ public class DroneAvailabilityService {
      * @return true if the drone is available, false otherwise
      */
     public boolean isDroneAvailable(
-            int droneId,
+            String droneId,
             LocalDate date,
             LocalTime time,
             List<DroneForServicePoint> allAvailability) {
@@ -83,7 +83,7 @@ public class DroneAvailabilityService {
      * @return true if available for ALL dispatches, false otherwise
      */
     public boolean isAvailableForAllDispatches(
-            int droneId,
+            String droneId,
             List<MedDispatchRec> dispatches,
             List<DroneForServicePoint> allAvailability) {
 
