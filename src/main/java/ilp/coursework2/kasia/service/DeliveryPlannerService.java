@@ -26,7 +26,7 @@ public class DeliveryPlannerService {
 
     /**
      * Plans delivery routes for all dispatches.
-     * Phase 1: Simple single-drone routing.
+     * Phase 1: Simple single-drone routing with cost validation.
      * 
      * @param dispatches      list of deliveries to make
      * @param allDrones       all available drones
@@ -47,56 +47,66 @@ public class DeliveryPlannerService {
         }
 
         // Find drones that can handle ALL dispatches
+        // (capacity/cooling/heating/availability)
         List<Integer> matchingDroneIds = droneMatchingService.findMatchingDrones(
                 dispatches,
                 allDrones,
                 availability);
 
         if (matchingDroneIds.isEmpty()) {
-            // No drone can handle all dispatches
             return new DeliveryPathResponse(0.0, 0, List.of());
         }
 
-        // Phase 1: Use first matching drone for all deliveries
-        int selectedDroneId = matchingDroneIds.get(0);
-        Drone selectedDrone = allDrones.stream()
-                .filter(d -> d.id() == selectedDroneId)
-                .findFirst()
-                .orElse(null);
+        // Try each matching drone until we find one that meets all constraints
+        // including cost
+        for (int droneId : matchingDroneIds) {
+            Drone drone = allDrones.stream()
+                    .filter(d -> d.id() == droneId)
+                    .findFirst()
+                    .orElse(null);
 
-        if (selectedDrone == null) {
-            return new DeliveryPathResponse(0.0, 0, List.of());
+            if (drone == null) {
+                continue;
+            }
+
+            // Find which service point has this drone
+            ServicePoint servicePoint = findServicePointForDrone(
+                    droneId,
+                    servicePoints,
+                    availability);
+
+            if (servicePoint == null) {
+                continue;
+            }
+
+            // Build the complete route
+            DronePath dronePath = buildRoute(
+                    drone,
+                    dispatches,
+                    servicePoint,
+                    restrictedAreas);
+
+            if (dronePath == null || dronePath.deliveries().isEmpty()) {
+                continue; // Try next drone
+            }
+
+            // Validate maxCost constraints
+            if (!validateMaxCostConstraints(dispatches, dronePath, drone)) {
+                continue; // This drone works but exceeds cost limit - try next one
+            }
+
+            // Success! This drone meets all constraints
+            int totalMoves = calculateTotalMoves(dronePath);
+            double totalCost = calculateTotalCost(drone, totalMoves);
+
+            return new DeliveryPathResponse(
+                    totalCost,
+                    totalMoves,
+                    List.of(dronePath));
         }
 
-        // Find which service point has this drone
-        ServicePoint startingServicePoint = findServicePointForDrone(
-                selectedDroneId,
-                servicePoints,
-                availability);
-
-        if (startingServicePoint == null) {
-            return new DeliveryPathResponse(0.0, 0, List.of());
-        }
-
-        // Build the complete route
-        DronePath dronePath = buildRoute(
-                selectedDrone,
-                dispatches,
-                startingServicePoint,
-                restrictedAreas);
-
-        if (dronePath == null || dronePath.deliveries().isEmpty()) {
-            return new DeliveryPathResponse(0.0, 0, List.of());
-        }
-
-        // Calculate totals
-        int totalMoves = calculateTotalMoves(dronePath);
-        double totalCost = calculateTotalCost(selectedDrone, totalMoves);
-
-        return new DeliveryPathResponse(
-                totalCost,
-                totalMoves,
-                List.of(dronePath));
+        // No drone could fulfill all constraints (including maxCost)
+        return new DeliveryPathResponse(0.0, 0, List.of());
     }
 
     /**
