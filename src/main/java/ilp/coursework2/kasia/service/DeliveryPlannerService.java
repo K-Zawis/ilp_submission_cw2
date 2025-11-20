@@ -1,9 +1,16 @@
 package ilp.coursework2.kasia.service;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import ilp.coursework2.kasia.model.*;
 
@@ -14,22 +21,110 @@ import ilp.coursework2.kasia.model.*;
 @Service
 public class DeliveryPlannerService {
 
+    private static final Logger logger = LoggerFactory.getLogger(DeliveryPlannerService.class);
+
     private final DroneService droneService;
     private final PathfindingService pathfindingService;
     private final DroneMatchingService droneMatchingService;
+    private final DroneAvailabilityService droneAvailabilityService;
 
     public DeliveryPlannerService(
             DroneService droneService,
             PathfindingService pathfindingService,
-            DroneMatchingService droneMatchingService) {
+            DroneMatchingService droneMatchingService,
+            DroneAvailabilityService droneAvailabilityService) {
         this.droneService = droneService;
         this.pathfindingService = pathfindingService;
         this.droneMatchingService = droneMatchingService;
+        this.droneAvailabilityService = droneAvailabilityService;
     }
 
     // ==================
     // Public Service Methods
     // ==================
+
+    /**
+     * Plans delivery routes for all dispatches.
+     * Tries single-drone first (Phase 1), then multi-drone (Phase 2).
+     * Returns whichever is more efficient using a weighted efficiency metric.
+     */
+    public DeliveryPathResponse planDeliveries(
+            List<MedDispatchRec> dispatches,
+            List<Drone> allDrones,
+            List<ServicePoint> servicePoints,
+            List<DroneForServicePoint> availability,
+            List<Region> restrictedAreas) {
+
+        if (dispatches == null || dispatches.isEmpty()) {
+            return new DeliveryPathResponse(0.0, 0, List.of());
+        }
+
+        // Phase 1: Try single drone
+        DeliveryPathResponse singleDroneResult = planSingleDroneDeliveries(
+                dispatches, allDrones, servicePoints, availability, restrictedAreas);
+
+        // Phase 2: Try multiple drones
+        DeliveryPathResponse multiDroneResult = planMultiDroneDeliveries(
+                dispatches, allDrones, servicePoints, availability, restrictedAreas);
+
+        boolean singleSuccess = !singleDroneResult.dronePaths().isEmpty();
+        boolean multiSuccess = !multiDroneResult.dronePaths().isEmpty();
+
+        // If only one succeeded, return it
+        if (singleSuccess && !multiSuccess) {
+            logger.info("Using single-drone solution");
+            return singleDroneResult;
+        }
+        if (multiSuccess && !singleSuccess) {
+            logger.info("Using multi-drone solution (single drone failed)");
+            return multiDroneResult;
+        }
+        if (!singleSuccess && !multiSuccess) {
+            logger.warn("Both single and multi-drone planning failed");
+            return new DeliveryPathResponse(0.0, 0, List.of());
+        }
+
+        // Both succeeded - compare using weighted efficiency
+        logger.info("Both approaches succeeded - comparing weighted efficiency");
+
+        int singleMaxMoves = singleDroneResult.dronePaths().stream()
+                .mapToInt(this::calculateTotalMoves)
+                .max()
+                .orElse(0);
+
+        int multiMaxMoves = multiDroneResult.dronePaths().stream()
+                .mapToInt(this::calculateTotalMoves)
+                .max()
+                .orElse(0);
+
+        logger.info("Single drone: cost={}, totalMoves={}, maxMoves={}",
+                singleDroneResult.totalCost(), singleDroneResult.totalMoves(), singleMaxMoves);
+
+        logger.info("Multi drone: cost={}, totalMoves={}, maxMoves={}",
+                multiDroneResult.totalCost(), multiDroneResult.totalMoves(), multiMaxMoves);
+
+        // Weighted scoring: lower is better
+        double weightMoves = 0.5;
+        double weightMaxDrone = 2.0;
+
+        double singleScore = singleDroneResult.totalCost()
+                + weightMoves * singleDroneResult.totalMoves()
+                + weightMaxDrone * singleMaxMoves;
+
+        double multiScore = multiDroneResult.totalCost()
+                + weightMoves * multiDroneResult.totalMoves()
+                + weightMaxDrone * multiMaxMoves;
+
+        logger.info("Weighted scores - single: {}, multi: {}", singleScore, multiScore);
+
+        if (multiScore < singleScore) {
+            logger.info("✓ Choosing multi-drone (better weighted efficiency)");
+            return multiDroneResult;
+        } else {
+            logger.info("✓ Choosing single-drone (better weighted efficiency)");
+            return singleDroneResult;
+        }
+    }
 
     /**
      * Plans delivery routes for all dispatches.
@@ -42,7 +137,7 @@ public class DeliveryPlannerService {
      * @param restrictedAreas no-fly zones
      * @return complete delivery plan with paths and costs
      */
-    public DeliveryPathResponse planDeliveries(
+    public DeliveryPathResponse planSingleDroneDeliveries(
             List<MedDispatchRec> dispatches,
             List<Drone> allDrones,
             List<ServicePoint> servicePoints,
@@ -120,6 +215,109 @@ public class DeliveryPlannerService {
 
         // No drone could fulfill all constraints (including maxCost)
         return new DeliveryPathResponse(0.0, 0, List.of());
+    }
+
+    /**
+     * Multi-drone planning (Phase 2).
+     * Assigns each delivery to the best available drone (closest + eligible),
+     * balancing load so no one drone is overloaded.
+     */
+    private DeliveryPathResponse planMultiDroneDeliveries(
+            List<MedDispatchRec> dispatches,
+            List<Drone> allDrones,
+            List<ServicePoint> servicePoints,
+            List<DroneForServicePoint> availability,
+            List<Region> restrictedAreas) {
+
+        if (dispatches == null || dispatches.isEmpty()) {
+            return new DeliveryPathResponse(0.0, 0, List.of());
+        }
+
+        logger.info("=== Starting Multi-Drone Planning (Balanced Per Delivery) ===");
+
+        List<DronePath> allDronePaths = new ArrayList<>();
+        Set<String> usedDroneIds = new HashSet<>();
+
+        dispatches.sort(
+                Comparator.comparing(
+                        (MedDispatchRec rec) -> LocalDate.parse(rec.date())
+                                .atTime(LocalTime.parse(rec.time()))));
+
+        for (MedDispatchRec delivery : dispatches) {
+
+            Drone bestDrone = null;
+            ServicePoint bestSP = null;
+            double bestScore = Double.MAX_VALUE;
+
+            for (Drone drone : allDrones) {
+                if (usedDroneIds.contains(drone.id()))
+                    continue; // only one delivery per drone in phase 2
+
+                ServicePoint sp = findServicePointForDrone(drone.id(), servicePoints, availability);
+                if (sp == null)
+                    continue;
+
+                if (!droneMatchingService.meetsRequirements(drone, delivery))
+                    continue;
+
+                if (!droneAvailabilityService.isAvailableForAllDispatches(
+                        drone.id(), List.of(delivery), availability))
+                    continue;
+
+                double dist = droneService.calculateDistance(
+                        new PositionPair(sp.location(), delivery.delivery()));
+
+                // balancing: prefer drones with smaller distance AND earlier finish time
+                double score = dist + (usedDroneIds.contains(drone.id()) ? 1_000_000 : 0);
+
+                if (score < bestScore) {
+                    bestScore = score;
+                    bestDrone = drone;
+                    bestSP = sp;
+                }
+            }
+
+            if (bestDrone == null || bestSP == null) {
+                logger.warn("No valid drone found for delivery {}", delivery.id());
+                return new DeliveryPathResponse(0.0, 0, List.of());
+            }
+
+            // Build route for this single delivery
+            DronePath path = buildRoute(bestDrone, List.of(delivery), bestSP, restrictedAreas);
+
+            if (path == null || path.deliveries().isEmpty()) {
+                logger.warn("Route could not be built for delivery {} with drone {}",
+                        delivery.id(), bestDrone.id());
+                return new DeliveryPathResponse(0.0, 0, List.of());
+            }
+
+            logger.info("Assigned delivery {} → drone {} (service point: {})",
+                    delivery.id(), bestDrone.id(), bestSP.name());
+
+            allDronePaths.add(path);
+            usedDroneIds.add(bestDrone.id());
+        }
+
+        // Totals
+        int totalMoves = allDronePaths.stream().mapToInt(this::calculateTotalMoves).sum();
+
+        double totalCost = allDronePaths.stream()
+                .mapToDouble(path -> {
+                    Drone drone = allDrones.stream()
+                            .filter(d -> d.id().equals(path.droneId()))
+                            .findFirst()
+                            .orElseThrow();
+
+                    int moves = calculateTotalMoves(path);
+                    return calculateTotalCost(drone, moves);
+                })
+                .sum();
+
+        logger.info("=== Multi-Drone Planning Complete ===");
+        logger.info("Total drones used: {}", allDronePaths.size());
+        logger.info("Total cost: {}, Total moves: {}", totalCost, totalMoves);
+
+        return new DeliveryPathResponse(totalCost, totalMoves, allDronePaths);
     }
 
     // ==================

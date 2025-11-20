@@ -368,12 +368,13 @@ public class DroneController implements IDroneController {
     /**
      * Plans delivery route and returns as GeoJSON FeatureCollection with restricted
      * areas.
-     * Shows both the flight path and no-fly/restricted zones.
+     * Shows all drone flight paths (color-coded) and no-fly/restricted zones.
+     * Supports both single-drone and multi-drone scenarios.
      * 
      * POST /api/v1/calcDeliveryPathAsGeoJsonWithZones
      * 
      * @param dispatches list of medical dispatch records
-     * @return GeoJSON FeatureCollection with flight path and restricted areas
+     * @return GeoJSON FeatureCollection with flight paths and restricted areas
      */
     @PostMapping("/calcDeliveryPathAsGeoJsonWithZones")
     public ResponseEntity<String> calcDeliveryPathAsGeoJsonWithZones(
@@ -394,9 +395,9 @@ public class DroneController implements IDroneController {
             return ResponseEntity.ok("{}");
         }
 
-        // Convert to GeoJSON with restricted areas
-        String geoJson = geoJsonService.convertDronePathWithRestrictedAreasToGeoJson(
-                response.dronePaths().get(0),
+        // Convert to GeoJSON - supports both single and multi-drone
+        String geoJson = geoJsonService.convertMultipleDronePathsToGeoJson(
+                response.dronePaths(),
                 restrictedAreas);
 
         return ResponseEntity.ok()

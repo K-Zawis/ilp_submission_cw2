@@ -237,4 +237,92 @@ public class GeoJsonService {
 
         return geoJson.toString();
     }
+
+    /**
+     * Converts multiple drone paths to GeoJSON FeatureCollection with restricted
+     * areas.
+     * Shows all drone routes in different colors.
+     * 
+     * @param dronePaths      list of all drone paths
+     * @param restrictedAreas list of restricted/no-fly zones
+     * @return GeoJSON FeatureCollection string
+     */
+    public String convertMultipleDronePathsToGeoJson(
+            List<DronePath> dronePaths,
+            List<Region> restrictedAreas) {
+
+        if (dronePaths == null || dronePaths.isEmpty()) {
+            return "{}";
+        }
+
+        JSONObject featureCollection = new JSONObject();
+        featureCollection.put("type", "FeatureCollection");
+
+        JSONArray features = new JSONArray();
+
+        // Different colors for different drones
+        String[] colors = { "#0000ff", "#00ff00", "#ff00ff", "#00ffff", "#ffff00" };
+
+        // Add each drone's path as a separate LineString
+        for (int i = 0; i < dronePaths.size(); i++) {
+            DronePath dronePath = dronePaths.get(i);
+            List<Position> completePath = mergePaths(dronePath);
+
+            String color = colors[i % colors.length];
+            String droneName = "Drone " + dronePath.droneId();
+
+            JSONObject pathFeature = createLineStringFeatureWithColor(completePath, droneName, color);
+            features.put(pathFeature);
+        }
+
+        // Add restricted areas
+        if (restrictedAreas != null) {
+            for (Region region : restrictedAreas) {
+                JSONObject restrictedFeature = createPolygonFeature(region);
+                features.put(restrictedFeature);
+            }
+        }
+
+        featureCollection.put("features", features);
+
+        return featureCollection.toString();
+    }
+
+    /**
+     * Creates a GeoJSON Feature containing a LineString geometry with custom color.
+     * 
+     * @param path        list of positions forming the line
+     * @param featureName name/description of the feature
+     * @param color       hex color code for the line
+     * @return JSONObject representing the Feature
+     */
+    private JSONObject createLineStringFeatureWithColor(List<Position> path, String featureName, String color) {
+        JSONObject feature = new JSONObject();
+        feature.put("type", "Feature");
+
+        // Properties
+        JSONObject properties = new JSONObject();
+        properties.put("name", featureName);
+        properties.put("stroke", color);
+        properties.put("stroke-width", 3);
+        properties.put("stroke-opacity", 0.8);
+        feature.put("properties", properties);
+
+        // Geometry
+        JSONObject geometry = new JSONObject();
+        geometry.put("type", "LineString");
+
+        JSONArray coordinates = new JSONArray();
+        for (Position pos : path) {
+            JSONArray point = new JSONArray();
+            point.put(pos.lng());
+            point.put(pos.lat());
+            coordinates.put(point);
+        }
+        geometry.put("coordinates", coordinates);
+
+        feature.put("geometry", geometry);
+
+        return feature;
+    }
 }

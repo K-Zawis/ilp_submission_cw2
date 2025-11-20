@@ -83,7 +83,7 @@ public class DroneMatchingService {
      * @param dispatch the dispatch record
      * @return true if requirements are met, false otherwise
      */
-    private boolean meetsRequirements(Drone drone, MedDispatchRec dispatch) {
+    public boolean meetsRequirements(Drone drone, MedDispatchRec dispatch) {
         DroneCapability capability = drone.capability();
 
         if (capability == null)
