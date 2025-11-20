@@ -10,17 +10,24 @@ import ilp.coursework2.kasia.model.PositionPair;
 import ilp.coursework2.kasia.model.Region;
 import ilp.coursework2.kasia.model.RegionRequest;
 import ilp.coursework2.kasia.model.enums.Direction;
+import ilp.coursework2.kasia.validator.RegionValidator;
 
 /**
  * A* pathfinding service for drone navigation.
- * Implements the A* algorithm as taught in ILP Lecture 6.
+ * Implements the A* algorithm with optimizations for obstacle avoidance.
  */
 @Service
 public class PathfindingService {
     private final DroneService droneService;
+    private final RegionValidator regionValidator;
 
-    public PathfindingService(DroneService droneService) {
+    // Cache for restricted area edges (avoid recomputing)
+    private List<List<Position>> cachedEdges = null;
+    private List<Region> cachedRegions = null;
+
+    public PathfindingService(DroneService droneService, RegionValidator regionValidator) {
         this.droneService = droneService;
+        this.regionValidator = regionValidator;
     }
 
     /**
@@ -53,14 +60,17 @@ public class PathfindingService {
                 return true;
             if (!(o instanceof Node node))
                 return false;
-            return positionsEqual(this.position, node.position);
+            // Use exact position comparison
+            return Double.compare(position.lng(), node.position.lng()) == 0 &&
+                    Double.compare(position.lat(), node.position.lat()) == 0;
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(
-                    Math.round(position.lng() / DroneService.DISTANCE),
-                    Math.round(position.lat() / DroneService.DISTANCE));
+            // Better hash function
+            long lngBits = Double.doubleToLongBits(position.lng());
+            long latBits = Double.doubleToLongBits(position.lat());
+            return (int) (lngBits ^ (lngBits >>> 32) ^ latBits ^ (latBits >>> 32));
         }
     }
 
@@ -96,6 +106,11 @@ public class PathfindingService {
             List<Region> restrictedAreas,
             Integer maxMoves) {
 
+        // Increased safety limits
+        long startTime = System.currentTimeMillis();
+        long timeoutMs = 15000; // 15 second timeout (increased)
+        int maxNodesExplored = 10000; // 10k nodes (increased)
+
         // Priority queue (min heap) for nodes to explore
         PriorityQueue<Node> openSet = new PriorityQueue<>();
 
@@ -112,6 +127,16 @@ public class PathfindingService {
         gScores.put(start, 0.0);
 
         while (!openSet.isEmpty()) {
+            // Check timeout
+            if (System.currentTimeMillis() - startTime > timeoutMs) {
+                return List.of();
+            }
+
+            // Check node limit to prevent memory exhaustion
+            if (closedSet.size() >= maxNodesExplored) {
+                return List.of();
+            }
+
             Node current = openSet.poll();
 
             // Goal reached!
@@ -139,8 +164,13 @@ public class PathfindingService {
                         direction.getAngle());
                 Position nextPos = droneService.calculateNextPosition(moveRequest);
 
-                // Check if in restricted area
+                // Check if destination is in restricted area
                 if (isInRestrictedArea(nextPos, restrictedAreas)) {
+                    continue;
+                }
+
+                // Check if the path crosses through restricted area
+                if (pathCrossesRestrictedArea(current.position, nextPos, restrictedAreas)) {
                     continue;
                 }
 
@@ -156,7 +186,8 @@ public class PathfindingService {
                 // This is the best path to nextPos so far
                 gScores.put(nextPos, tentativeGScore);
 
-                hScore = heuristic(nextPos, goal);
+                // Use weighted heuristic for better pathfinding
+                hScore = heuristic(nextPos, goal) * 1.1; // Slight weight towards goal
                 Node neighbor = new Node(nextPos, current, direction, tentativeGScore, hScore);
                 openSet.add(neighbor);
             }
@@ -180,15 +211,58 @@ public class PathfindingService {
     }
 
     /**
+     * Check if the line segment from p1 to p2 crosses through any restricted area.
+     * Uses cached edges for better performance.
+     */
+    private boolean pathCrossesRestrictedArea(Position p1, Position p2, List<Region> regions) {
+        // Build edge cache if needed
+        if (cachedEdges == null || cachedRegions != regions) {
+            buildEdgeCache(regions);
+        }
+
+        // Check intersection with cached edges
+        for (int regionIdx = 0; regionIdx < regions.size(); regionIdx++) {
+            Region region = regions.get(regionIdx);
+            List<Position> edges = cachedEdges.get(regionIdx);
+
+            for (int i = 0; i < edges.size() - 1; i++) {
+                Position v1 = edges.get(i);
+                Position v2 = edges.get(i + 1);
+
+                if (regionValidator.doSegmentsIntersect(p1, p2, v1, v2)) {
+                    return true;
+                }
+            }
+
+            // Check if either endpoint is inside the region
+            RegionRequest req1 = new RegionRequest(p1, region);
+            RegionRequest req2 = new RegionRequest(p2, region);
+            if (droneService.isPointInRegion(req1) || droneService.isPointInRegion(req2)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Build cache of region edges for faster intersection testing.
+     */
+    private void buildEdgeCache(List<Region> regions) {
+        cachedEdges = new ArrayList<>();
+        cachedRegions = regions;
+
+        for (Region region : regions) {
+            cachedEdges.add(new ArrayList<>(region.vertices()));
+        }
+    }
+
+    /**
      * Heuristic function for A*.
      * Uses Euclidean distance as an admissible heuristic.
      */
     private double heuristic(Position from, Position to) {
-        // Use your DroneService to calculate distance
         PositionPair pair = new PositionPair(from, to);
         double distance = droneService.calculateDistance(pair);
-
-        // Convert to number of moves (each move is MOVE_DISTANCE degrees)
         return distance / DroneService.DISTANCE;
     }
 
@@ -225,7 +299,7 @@ public class PathfindingService {
      * Calculate the total cost (number of moves) for a path.
      */
     public int calculatePathCost(List<Position> path) {
-        return Math.max(0, path.size() - 1); // Subtract 1 because path includes start
+        return Math.max(0, path.size() - 1);
     }
 
     /**

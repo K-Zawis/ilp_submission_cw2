@@ -68,7 +68,8 @@ public class DeliveryPlannerService {
         // including cost
         for (String droneId : matchingDroneIds) {
             Drone drone = allDrones.stream()
-                    .filter(d -> d.id() == droneId)
+                    .filter(d -> d.id().equals(
+                            droneId))
                     .findFirst()
                     .orElse(null);
 
@@ -259,7 +260,7 @@ public class DeliveryPlannerService {
         // Find which service point has this drone
         for (DroneForServicePoint dfsp : availability) {
             boolean hasDrone = dfsp.drones().stream()
-                    .anyMatch(da -> da.id() == droneId);
+                    .anyMatch(da -> da.id().equals(droneId));
 
             if (hasDrone) {
                 // Find the corresponding ServicePoint

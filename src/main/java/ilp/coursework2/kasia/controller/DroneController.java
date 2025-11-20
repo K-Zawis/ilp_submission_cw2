@@ -211,7 +211,8 @@ public class DroneController implements IDroneController {
 
         // Find the specific drone by ID
         Drone drone = allDrones.stream()
-                .filter(d -> d.id() == id)
+                .filter(d -> d.id().equals(
+                        id))
                 .findFirst()
                 .orElse(null);
 
@@ -354,6 +355,49 @@ public class DroneController implements IDroneController {
 
         // Convert to GeoJSON using service
         String geoJson = geoJsonService.convertDronePathToGeoJson(response.dronePaths().get(0));
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(geoJson);
+    }
+
+    // ==================
+    // Additional stuff
+    // ==================
+
+    /**
+     * Plans delivery route and returns as GeoJSON FeatureCollection with restricted
+     * areas.
+     * Shows both the flight path and no-fly/restricted zones.
+     * 
+     * POST /api/v1/calcDeliveryPathAsGeoJsonWithZones
+     * 
+     * @param dispatches list of medical dispatch records
+     * @return GeoJSON FeatureCollection with flight path and restricted areas
+     */
+    @PostMapping("/calcDeliveryPathAsGeoJsonWithZones")
+    public ResponseEntity<String> calcDeliveryPathAsGeoJsonWithZones(
+            @RequestBody List<MedDispatchRec> dispatches) {
+
+        // Fetch fresh data from ILP service
+        List<Drone> allDrones = ilpService.getAllDrones();
+        List<ServicePoint> servicePoints = ilpService.getServicePoints();
+        List<DroneForServicePoint> availability = ilpService.getDronesForServicePoints();
+        List<Region> restrictedAreas = ilpService.getRestrictedAreas();
+
+        // Plan the deliveries
+        DeliveryPathResponse response = deliveryPlannerService.planDeliveries(
+                dispatches, allDrones, servicePoints, availability, restrictedAreas);
+
+        // Check if planning succeeded
+        if (response.dronePaths().isEmpty()) {
+            return ResponseEntity.ok("{}");
+        }
+
+        // Convert to GeoJSON with restricted areas
+        String geoJson = geoJsonService.convertDronePathWithRestrictedAreasToGeoJson(
+                response.dronePaths().get(0),
+                restrictedAreas);
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)

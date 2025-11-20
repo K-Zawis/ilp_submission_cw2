@@ -158,7 +158,7 @@ public class RegionValidator implements IRegionValidator {
      * @param p4 second endpoint of segment 2
      * @return true if the segments intersect, false otherwise
      */
-    private boolean doSegmentsIntersect(Position p1, Position p2, Position p3, Position p4) {
+    public boolean doSegmentsIntersect(Position p1, Position p2, Position p3, Position p4) {
         // Calculate directions using cross product
         double d1 = crossProduct(p3, p4, p1);
         double d2 = crossProduct(p3, p4, p2);

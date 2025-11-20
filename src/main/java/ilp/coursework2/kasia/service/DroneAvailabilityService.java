@@ -38,7 +38,7 @@ public class DroneAvailabilityService {
         // Find this drone's availability across all service points
         for (DroneForServicePoint servicePoint : allAvailability) {
             for (DroneAvailability droneAvail : servicePoint.drones()) {
-                if (droneAvail.id() == droneId) {
+                if (droneAvail.id().equals(droneId)) {
                     // Check if drone is available on this day/time
                     return isAvailableAtTime(droneAvail, dayOfWeek, time);
                 }
