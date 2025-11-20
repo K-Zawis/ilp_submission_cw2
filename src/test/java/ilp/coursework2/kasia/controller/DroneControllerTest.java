@@ -17,6 +17,11 @@ import ilp.coursework2.kasia.interfaces.IDroneService;
 import ilp.coursework2.kasia.interfaces.IPositionValidator;
 import ilp.coursework2.kasia.interfaces.IRegionValidator;
 import ilp.coursework2.kasia.model.Position;
+import ilp.coursework2.kasia.service.DeliveryPlannerService;
+import ilp.coursework2.kasia.service.DroneMatchingService;
+import ilp.coursework2.kasia.service.DroneQueryService;
+import ilp.coursework2.kasia.service.GeoJsonService;
+import ilp.coursework2.kasia.service.IlpService;
 
 @WebMvcTest(DroneController.class)
 @DisplayName("Drone Controller Tests")
@@ -28,14 +33,27 @@ class DroneControllerTest {
     @SuppressWarnings("removal")
     @MockBean
     private IDroneService droneService;
-
     @SuppressWarnings("removal")
     @MockBean
     private IPositionValidator positionValidator;
-
     @SuppressWarnings("removal")
     @MockBean
     private IRegionValidator regionValidator;
+    @SuppressWarnings("removal")
+    @MockBean
+    private IlpService ilpService;
+    @SuppressWarnings("removal")
+    @MockBean
+    private DroneQueryService droneQueryService;
+    @SuppressWarnings("removal")
+    @MockBean
+    private DroneMatchingService droneMatchingService;
+    @SuppressWarnings("removal")
+    @MockBean
+    private DeliveryPlannerService deliveryPlannerService;
+    @SuppressWarnings("removal")
+    @MockBean
+    private GeoJsonService geoJsonService;
 
     @Test
     @DisplayName("GET /uid returns student ID")
