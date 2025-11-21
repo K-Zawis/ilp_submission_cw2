@@ -1,0 +1,86 @@
+ ╭─zawis@rog in repo: ilp_submission_2 on  master [!] is  v0.0.1-SNAPSHOT via  v21.0.8 took 7s
+ ╰─λ ./test_submission.sh s2340338
+══════════════════════════════
+ILP Docker Submission Test    
+══════════════════════════════
+
+⚠ Tar file not found                              
+Found Dockerfile, building image...
+✓ Old image removed                    
+✓ Image built successfully        
+✓ Step 1: Tar file created    
+✓ Step 2: Cleanup complete                          
+✓ Step 3: Image loaded successfully                    
+✓ Step 4: Container created (ID: 1fae5c1cac26)
+✓ Step 5: Container is running                     
+✓ Step 6: Health endpoint responding (Status: UP)
+
+Step 7: Running API endpoint tests...
+PASS|Health check
+PASS|UID endpoint
+PASS|distanceTo (valid)
+PASS|distanceTo (invalid)
+PASS|isCloseTo (valid)
+PASS|isCloseTo (invalid)
+PASS|nextPosition (valid)
+PASS|nextPosition (invalid)
+PASS|isInRegion (valid)
+PASS|isInRegion (open region)
+PASS|isInRegion (invalid)
+PASS|dronesWithCooling (true)
+PASS|dronesWithCooling (false)
+PASS|droneDetails (valid ID)
+PASS|droneDetails (invalid ID)
+PASS|queryAsPath (capacity)
+PASS|queryAsPath (cooling)
+PASS|query (single criterion)
+PASS|query (multiple criteria)
+PASS|queryAvailableDrones (simple)
+PASS|queryAvailableDrones (multiple)
+PASS|calcDeliveryPath (single)
+PASS|calcDeliveryPath (multiple)
+PASS|calcDeliveryPathAsGeoJson (single)
+
+
+═══════════════════════════════
+Test Results Summary           
+═══════════════════════════════
+
+✓ Health check
+✓ UID endpoint
+✓ distanceTo (valid)
+✓ distanceTo (invalid)
+✓ isCloseTo (valid)
+✓ isCloseTo (invalid)
+✓ nextPosition (valid)
+✓ nextPosition (invalid)
+✓ isInRegion (valid)
+✓ isInRegion (open region)
+✓ isInRegion (invalid)
+✓ dronesWithCooling (true)
+✓ dronesWithCooling (false)
+✓ droneDetails (valid ID)
+✓ droneDetails (invalid ID)
+✓ queryAsPath (capacity)
+✓ queryAsPath (cooling)
+✓ query (single criterion)
+✓ query (multiple criteria)
+✓ queryAvailableDrones (simple)
+✓ queryAvailableDrones (multiple)
+✓ calcDeliveryPath (single)
+✓ calcDeliveryPath (multiple)
+✓ calcDeliveryPathAsGeoJson (single)
+
+═══════════════════════════════
+Tests Passed: 24
+Tests Failed: 0
+0
+═══════════════════════════════
+
+Cleaning up...
+✓ Container stopped            
+✓ Container removed            
+✓ Test image removed            
+✓ Cleanup complete                   
+
+All done!

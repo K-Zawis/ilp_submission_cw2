@@ -25,7 +25,7 @@ spinner() {
         i=$(( (i + 1) % ${#spinstr[@]} ))
         sleep 0.1
     done
-    printf "\r%*s\r" $(( ${#message} + 10 )) ""  # Clear entire line properly
+    printf "\r%*s\r" $(( ${#message} + 10 )) ""
 }
 
 # function to run command with spinner
@@ -34,7 +34,6 @@ run_with_spinner() {
     shift
     local cmd="$@"
     
-    # Run command in background and capture output
     eval "$cmd" > /tmp/spinner_output 2>&1 &
     local pid=$!
     
@@ -45,7 +44,6 @@ run_with_spinner() {
     
     return $exit_code
 }
-
 
 # config
 TAR_FILE="ilp_submission_image.tar"
@@ -64,27 +62,24 @@ if [ ! -f "${TAR_FILE}" ]; then
     printf "\r%*s\r" 50 ""
     echo -e "${YELLOW}⚠ Tar file not found${NC}"
     
-    # Try to find and build from Dockerfile
     if [ -f "Dockerfile" ]; then
         echo -e "Found Dockerfile, building image..."
     
-        # Remove old ilp_cw1 image if it exists
         if docker images ilp_cw1 | grep -q ilp_cw1; then
             run_with_spinner "Removing old ilp_cw1 image..." "docker rmi -f ilp_cw1 > /dev/null 2>&1"
             echo -e "${GREEN}✓ Old image removed${NC}"
             sleep 0.5
         fi
         
-        set +e  # Disable exit on error
+        set +e
         run_with_spinner "Building Docker image..." "docker build -t ilp_cw1 . > /tmp/docker_build_output 2>&1"
         BUILD_EXIT_CODE=$?
-        set -e  # Re-enable exit on error
+        set -e
         
         if [ $BUILD_EXIT_CODE -eq 0 ]; then
             echo -e "${GREEN}✓ Image built successfully${NC}"
             sleep 0.5
             
-            # Save to tar
             run_with_spinner "Creating tar file..." "docker image save ilp_cw1 -o $TAR_FILE"
             echo -e "${GREEN}✓ Step 1: Tar file created${NC}"
             sleep 0.5
@@ -104,7 +99,7 @@ else
     sleep 0.5
 fi
 
-# Step 2: Cleanup with spinner
+# Step 2: Cleanup
 run_with_spinner "Step 2: Cleaning up existing containers..." "docker rm -f '$CONTAINER_NAME' 2>/dev/null || true; docker rmi -f ilp_test_image 2>/dev/null || true"
 echo -e "${GREEN}✓ Step 2: Cleanup complete${NC}"
 sleep 0.5
@@ -116,23 +111,19 @@ LOAD_EXIT_CODE=$?
 set -e
 
 if [ $LOAD_EXIT_CODE -eq 0 ]; then
-    # Extract image ID or tag
     IMAGE_ID=$(grep -oP '(?<=Loaded image: |Loaded image ID: sha256:)\S+' /tmp/docker_load_output | head -1)
     
     if [ -z "$IMAGE_ID" ]; then
         echo -e "${RED}✗ Step 3: Failed to extract image ID${NC}"
-        echo "Load output:"
         cat /tmp/docker_load_output
         exit 1
     fi
     
-    # Tag the image for easier reference
     run_with_spinner "Tagging image as ilp_test_image..." "docker tag '$IMAGE_ID' ilp_test_image > /dev/null 2>&1"
     echo -e "${GREEN}✓ Step 3: Image loaded successfully${NC}"
     sleep 0.5
 else
     echo -e "${RED}✗ Step 3: Failed to load image${NC}"
-    echo "Error output:"
     cat /tmp/docker_load_output
     exit 1
 fi
@@ -148,7 +139,6 @@ if [ $RUN_EXIT_CODE -eq 0 ]; then
     
     if [ -z "$CONTAINER_ID" ]; then
         echo -e "${RED}✗ Step 4: Container created but ID not found${NC}"
-        echo "Output:"
         cat /tmp/docker_run_output
         exit 1
     fi
@@ -157,13 +147,12 @@ if [ $RUN_EXIT_CODE -eq 0 ]; then
     sleep 0.5
 else
     echo -e "${RED}✗ Step 4: Failed to start container${NC}"
-    echo "Error output:"
     cat /tmp/docker_run_output
     exit 1
 fi
 
 # Step 5: Wait for container to be running
-MAX_WAIT=30  # Maximum 30 seconds
+MAX_WAIT=30
 WAIT_COUNT=0
 
 set +e
@@ -185,7 +174,6 @@ if [ $WAITING_EXIT_CODE -eq 0 ]; then
     sleep 0.5
 else
     echo -e "${RED}✗ Step 5: Container failed to start within ${MAX_WAIT}s${NC}"
-    echo "Container logs:"
     docker logs "$CONTAINER_NAME" 2>&1 || echo "No logs available"
     exit 1
 fi
@@ -212,7 +200,6 @@ if [ $ENDPOINT_EXIT -eq 0 ]; then
 else
     echo -e "${RED}✗ Step 6: Health endpoint not responding${NC}"
     echo "Tried: http://localhost:$PORT/actuator/health"
-    echo "Container may have crashed or actuator not configured. Check logs:"
     echo -e "${YELLOW}docker logs $CONTAINER_NAME${NC}"
     exit 1
 fi
@@ -220,14 +207,12 @@ fi
 # Step 7: Running API endpoint tests
 echo ""
 
-# Create a test script that runs all tests
 cat > /tmp/run_api_tests.sh << 'TESTEOF'
 #!/bin/bash
 
 PORT=$1
 STUDENT_ID=$2
 
-# Helper function to test endpoint
 test_endpoint() {
     local test_name="$1"
     local method="$2"
@@ -247,7 +232,7 @@ test_endpoint() {
     
     if [ $? -ne 0 ]; then
         echo "FAIL|$test_name|Connection failed"
-        return 0  # Don't exit script, just continue
+        return 0
     fi
     
     HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
@@ -267,10 +252,10 @@ test_endpoint() {
         echo "FAIL|$test_name|Expected $expected_code, got $HTTP_CODE"
     fi
     
-    return 0  # Always return 0 so script continues
+    return 0
 }
 
-# Run all tests
+echo "=== CW1 Tests ===" > /dev/stderr
 test_endpoint "Health check" "GET" "../../actuator/health" "" "200" '"status":"UP"'
 test_endpoint "UID endpoint" "GET" "uid" "" "200" "$STUDENT_ID"
 test_endpoint "distanceTo (valid)" "POST" "distanceTo" '{"position1": {"lng": -3.192473, "lat": 55.946233}, "position2": {"lng": -3.192473, "lat": 55.942617}}' "200" ""
@@ -283,39 +268,65 @@ test_endpoint "isInRegion (valid)" "POST" "isInRegion" '{"position": {"lng": -3.
 test_endpoint "isInRegion (open region)" "POST" "isInRegion" '{"position": {"lng": -3.188, "lat": 55.944}, "region": {"name": "central", "vertices": [{"lng": -3.192473, "lat": 55.946233}, {"lng": -3.192473, "lat": 55.942617}, {"lng": -3.184319, "lat": 55.942617}]}}' "400" ""
 test_endpoint "isInRegion (invalid)" "POST" "isInRegion" '{"position": {"lng": -3.188}}' "400" ""
 
-exit 0  # Always exit successfully
+echo "" > /dev/stderr
+echo "=== CW2 Static Query Tests ===" > /dev/stderr
+test_endpoint "dronesWithCooling (true)" "GET" "dronesWithCooling/true" "" "200" ""
+test_endpoint "dronesWithCooling (false)" "GET" "dronesWithCooling/false" "" "200" ""
+test_endpoint "droneDetails (valid ID)" "GET" "droneDetails/1" "" "200" '"id":"1"'
+test_endpoint "droneDetails (invalid ID)" "GET" "droneDetails/999" "" "404" ""
+
+echo "" > /dev/stderr
+echo "=== CW2 Dynamic Query Tests ===" > /dev/stderr
+test_endpoint "queryAsPath (capacity)" "GET" "queryAsPath/capacity/8" "" "200" ""
+test_endpoint "queryAsPath (cooling)" "GET" "queryAsPath/cooling/true" "" "200" ""
+test_endpoint "query (single criterion)" "POST" "query" '[{"attribute":"capacity","operator":"<","value":"10"}]' "200" ""
+test_endpoint "query (multiple criteria)" "POST" "query" '[{"attribute":"capacity","operator":">","value":"5"},{"attribute":"cooling","operator":"=","value":"false"}]' "200" ""
+
+echo "" > /dev/stderr
+echo "=== CW2 Availability Tests ===" > /dev/stderr
+test_endpoint "queryAvailableDrones (simple)" "POST" "queryAvailableDrones" '[{"id":1,"date":"2025-11-20","time":"14:00","requirements":{"capacity":2.0}}]' "200" ""
+test_endpoint "queryAvailableDrones (multiple)" "POST" "queryAvailableDrones" '[{"id":1,"date":"2025-11-20","time":"14:00","requirements":{"capacity":2.0}},{"id":2,"date":"2025-11-20","time":"15:00","requirements":{"capacity":3.0,"cooling":true}}]' "200" ""
+
+echo "" > /dev/stderr
+echo "=== CW2 Delivery Planning Tests ===" > /dev/stderr
+test_endpoint "calcDeliveryPath (single)" "POST" "calcDeliveryPath" '[{"id":1,"date":"2025-11-20","time":"14:00","requirements":{"capacity":2.0},"delivery":{"lng":-3.186,"lat":55.945}}]' "200" '"totalCost"'
+test_endpoint "calcDeliveryPath (multiple)" "POST" "calcDeliveryPath" '[{"id":1,"date":"2025-11-20","time":"14:00","requirements":{"capacity":2.0},"delivery":{"lng":-3.186,"lat":55.945}},{"id":2,"date":"2025-11-20","time":"14:30","requirements":{"capacity":2.0},"delivery":{"lng":-3.188,"lat":55.943}}]' "200" '"totalMoves"'
+test_endpoint "calcDeliveryPathAsGeoJson (single)" "POST" "calcDeliveryPathAsGeoJson" '[{"id":1,"date":"2025-11-20","time":"14:00","requirements":{"capacity":2.0},"delivery":{"lng":-3.186,"lat":55.945}}]' "200" '"type"'
+
+exit 0
 TESTEOF
 
 chmod +x /tmp/run_api_tests.sh
 
-# Run tests with spinner
-run_with_spinner "Step 7: Running API endpoint tests..." "/tmp/run_api_tests.sh $PORT $STUDENT_ID > /tmp/test_results.txt 2>&1"
+echo -e "${YELLOW}Step 7: Running API endpoint tests...${NC}"
+/tmp/run_api_tests.sh $PORT $STUDENT_ID 2>&1 | tee /tmp/test_results.txt | grep -E "^(PASS|FAIL)" || true
+echo ""
 
-# Parse results
 echo ""
 echo -e "═══════════════════════════════"
-echo -e "Test Results                   "
+echo -e "Test Results Summary           "
 echo -e "═══════════════════════════════"
 echo ""
 
 TESTS_PASSED=0
 TESTS_FAILED=0
 
-set +e  # Disable exit on error for counting
+set +e
 
 if [ -f /tmp/test_results.txt ]; then
-    while IFS='|' read -r status test_name reason; do
-        if [ "$status" = "PASS" ]; then
-            echo -e "${GREEN}✓${NC} $test_name"
-            TESTS_PASSED=$((TESTS_PASSED + 1))
-        elif [ "$status" = "FAIL" ]; then
-            echo -e "${RED}✗${NC} $test_name${reason:+ - $reason}"
-            TESTS_FAILED=$((TESTS_FAILED + 1))
-        fi
-    done < /tmp/test_results.txt
+    grep "^PASS" /tmp/test_results.txt | while IFS='|' read -r status test_name; do
+        echo -e "${GREEN}✓${NC} $test_name"
+    done
+    
+    grep "^FAIL" /tmp/test_results.txt | while IFS='|' read -r status test_name reason; do
+        echo -e "${RED}✗${NC} $test_name${reason:+ - $reason}"
+    done
+    
+    TESTS_PASSED=$(grep -c "^PASS" /tmp/test_results.txt || echo 0)
+    TESTS_FAILED=$(grep -c "^FAIL" /tmp/test_results.txt || echo 0)
 fi
 
-set -e  # Re-enable exit on error
+set -e
 
 echo ""
 echo -e "═══════════════════════════════"
@@ -324,14 +335,11 @@ echo -e "Tests Failed: ${RED}$TESTS_FAILED${NC}"
 echo -e "═══════════════════════════════"
 echo ""
 
-echo ""
-
 # Cleanup
 echo -e "${YELLOW}Cleaning up...${NC}"
 
-set +e  # Don't exit if cleanup commands fail
+set +e
 
-# Stop and remove container
 if docker ps -a --filter "name=$CONTAINER_NAME" --format '{{.Names}}' | grep -q "$CONTAINER_NAME"; then
     run_with_spinner "Stopping container..." "docker stop $CONTAINER_NAME > /dev/null 2>&1"
     echo -e "${GREEN}✓ Container stopped${NC}"
@@ -340,13 +348,11 @@ if docker ps -a --filter "name=$CONTAINER_NAME" --format '{{.Names}}' | grep -q 
     echo -e "${GREEN}✓ Container removed${NC}"
 fi
 
-# Remove test image
 if docker images ilp_test_image --format '{{.Repository}}' | grep -q ilp_test_image; then
     run_with_spinner "Removing test image..." "docker rmi ilp_test_image > /dev/null 2>&1"
     echo -e "${GREEN}✓ Test image removed${NC}"
 fi
 
-# Optional: Clean up dangling images
 run_with_spinner "Cleaning dangling images..." "docker image prune -f > /dev/null 2>&1"
 echo -e "${GREEN}✓ Cleanup complete${NC}"
 
