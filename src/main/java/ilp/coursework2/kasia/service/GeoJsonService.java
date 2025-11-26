@@ -10,6 +10,7 @@ import ilp.coursework2.kasia.model.Delivery;
 import ilp.coursework2.kasia.model.DronePath;
 import ilp.coursework2.kasia.model.Position;
 import ilp.coursework2.kasia.model.Region;
+import ilp.coursework2.kasia.model.ServicePoint;
 
 /**
  * Service for converting flight paths to GeoJSON format.
@@ -286,6 +287,79 @@ public class GeoJsonService {
         featureCollection.put("features", features);
 
         return featureCollection.toString();
+    }
+
+    public String convertRestrictedAreasToGeoJson(List<Region> restrictedAreas) {
+        StringBuilder geoJson = new StringBuilder();
+        geoJson.append("{\"type\":\"FeatureCollection\",\"features\":[");
+
+        boolean first = true;
+        for (Region area : restrictedAreas) {
+            if (!first) {
+                geoJson.append(",");
+            }
+            first = false;
+
+            geoJson.append("{\"type\":\"Feature\",");
+            geoJson.append("\"properties\":{");
+            geoJson.append("\"name\":\"").append(area.name()).append("\",");
+            geoJson.append("\"type\":\"").append(isNoFlyZone(area) ? "no-fly" : "restricted").append("\"");
+            geoJson.append("},");
+            geoJson.append("\"geometry\":{");
+            geoJson.append("\"type\":\"Polygon\",");
+            geoJson.append("\"coordinates\":[[");
+
+            // Add vertices
+            boolean firstVertex = true;
+            for (Position vertex : area.vertices()) {
+                if (!firstVertex) {
+                    geoJson.append(",");
+                }
+                firstVertex = false;
+                geoJson.append("[").append(vertex.lng()).append(",").append(vertex.lat()).append("]");
+            }
+
+            geoJson.append("]]}}");
+        }
+
+        geoJson.append("]}");
+        return geoJson.toString();
+    }
+
+    /**
+     * Converts service points to GeoJSON FeatureCollection with Point geometries.
+     * Each service point becomes a marker on the map.
+     * 
+     * @param servicePoints list of drone service points
+     * @return GeoJSON FeatureCollection string
+     */
+    public String convertServicePointsToGeoJson(List<ServicePoint> servicePoints) {
+        StringBuilder geoJson = new StringBuilder();
+        geoJson.append("{\"type\":\"FeatureCollection\",\"features\":[");
+
+        boolean first = true;
+        for (ServicePoint sp : servicePoints) {
+            if (!first) {
+                geoJson.append(",");
+            }
+            first = false;
+
+            geoJson.append("{\"type\":\"Feature\",");
+            geoJson.append("\"properties\":{");
+            geoJson.append("\"id\":").append(sp.id()).append(",");
+            geoJson.append("\"name\":\"").append(sp.name()).append("\",");
+            geoJson.append("\"type\":\"service-point\"");
+            geoJson.append("},");
+            geoJson.append("\"geometry\":{");
+            geoJson.append("\"type\":\"Point\",");
+            geoJson.append("\"coordinates\":[");
+            geoJson.append(sp.location().lng()).append(",");
+            geoJson.append(sp.location().lat());
+            geoJson.append("]}}");
+        }
+
+        geoJson.append("]}");
+        return geoJson.toString();
     }
 
     /**

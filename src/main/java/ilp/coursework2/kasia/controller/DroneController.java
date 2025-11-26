@@ -362,7 +362,7 @@ public class DroneController implements IDroneController {
     }
 
     // ==================
-    // Additional stuff
+    // Additional stuff - test and CW3
     // ==================
 
     /**
@@ -399,6 +399,59 @@ public class DroneController implements IDroneController {
         String geoJson = geoJsonService.convertMultipleDronePathsToGeoJson(
                 response.dronePaths(),
                 restrictedAreas);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(geoJson);
+    }
+
+    /**
+     * Returns all restricted areas as GeoJSON FeatureCollection.
+     * Useful for displaying no-fly zones and restricted areas on the map
+     * without needing to plan a delivery.
+     * 
+     * GET /api/v1/restrictedAreasGeoJson
+     * 
+     * @return GeoJSON FeatureCollection with all restricted/no-fly zones
+     */
+    @GetMapping("/restrictedAreasGeoJson")
+    public ResponseEntity<String> getRestrictedAreasAsGeoJson() {
+        // Fetch restricted areas from ILP service
+        List<Region> restrictedAreas = ilpService.getRestrictedAreas();
+
+        // Check if any restricted areas exist
+        if (restrictedAreas == null || restrictedAreas.isEmpty()) {
+            return ResponseEntity.ok("{}");
+        }
+
+        // Convert to GeoJSON
+        String geoJson = geoJsonService.convertRestrictedAreasToGeoJson(restrictedAreas);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(geoJson);
+    }
+
+    /**
+     * Returns all service points as GeoJSON FeatureCollection.
+     * Shows drone service point locations on the map with metadata.
+     * 
+     * GET /api/v1/servicePointsGeoJson
+     * 
+     * @return GeoJSON FeatureCollection with service point markers
+     */
+    @GetMapping("/servicePointsGeoJson")
+    public ResponseEntity<String> getServicePointsAsGeoJson() {
+        // Fetch service points from ILP service
+        List<ServicePoint> servicePoints = ilpService.getServicePoints();
+
+        // Check if any service points exist
+        if (servicePoints == null || servicePoints.isEmpty()) {
+            return ResponseEntity.ok("{}");
+        }
+
+        // Convert to GeoJSON
+        String geoJson = geoJsonService.convertServicePointsToGeoJson(servicePoints);
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
