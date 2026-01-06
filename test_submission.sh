@@ -55,6 +55,21 @@ echo -e "═══════════════════════�
 echo -e "ILP Docker Submission Test    "
 echo -e "══════════════════════════════\n"
 
+# Step 0: Build application with Maven
+set +e
+run_with_spinner "Step 0: Building application with Maven..." "mvn clean package -DskipTests > /tmp/maven_build_output 2>&1"
+MVN_EXIT_CODE=$?
+set -e
+
+if [ $MVN_EXIT_CODE -eq 0 ]; then
+    echo -e "${GREEN}✓ Step 0: Application built successfully${NC}"
+    sleep 0.5
+else
+    echo -e "${RED}✗ Step 0: Maven build failed${NC}"
+    cat /tmp/maven_build_output
+    exit 1
+fi
+
 # Step 1: Check/create tar file
 run_with_spinner "Step 1: Checking if tar file exists..." "sleep 0.5"
 
